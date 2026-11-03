@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SHADOW CELL: OPERATION ARGON // Third Echelon Tactical Stealth</title>
+  <link rel="icon" href="data:,">
+  <style>
+    :root {
+      --sc-green: #38ff6a;
+      --sc-green-dim: rgba(56, 255, 106, 0.25);
+      --sc-green-dark: #071a0e;
+      --sc-amber: #ffc83b;
+      --sc-red: #ff384c;
+      --sc-cyan: #4fc3f7;
+      --hud-bg: rgba(5, 14, 9, 0.82);
+      --hud-border: rgba(56, 255, 106, 0.45);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #020504;
+      font-family: 'Courier New', Consolas, monospace;
+      color: #d4f7dc;
+    }
+
+    #game-container {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+    }
+
+    /* Post-Processing Vision Overlays (NVG & Thermal) */
+    #vision-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 5;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    #vision-overlay.nvg {
+      opacity: 1;
+      background:
+        radial-gradient(circle at center, rgba(56, 255, 106, 0.08) 0%, rgba(10, 55, 22, 0.45) 75%, rgba(0, 12, 4, 0.88) 100%),
+        repeating-linear-gradient(
+          0deg,
+          rgba(56, 255, 106, 0.07) 0px,
+          rgba(56, 255, 106, 0.07) 1px,
+          transparent 1px,
+          transparent 3px
+        );
+      box-shadow: inset 0 0 90px rgba(56, 255, 106, 0.35);
+    }
+
+    #vision-overlay.thermal {
+      opacity: 1;
+      background:
+        radial-gradient(circle at center, rgba(35, 80, 255, 0.12) 0%, rgba(12, 16, 65, 0.5) 75%, rgba(4, 4, 24, 0.9) 100%),
+        repeating-linear-gradient(
+          0deg,
+          rgba(79, 195, 247, 0.06) 0px,
+          rgba(79, 195, 247, 0.06) 1px,
+          transparent 1px,
+          transparent 3px
+        );
+      box-shadow: inset 0 0 90px rgba(79, 195, 247, 0.35);
+    }
+
+    /* Tactical HUD Overlay */
+    #hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+      padding: 18px 22px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .hud-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+    }
+
+    .hud-panel {
+      background: var(--hud-bg);
+      border: 1px solid var(--hud-border);
+      box-shadow: 0 0 18px rgba(0, 0, 0, 0.75), inset 0 0 12px rgba(56, 255, 106, 0.08);
+      padding: 12px 15px;
+      border-radius: 3px;
+      backdrop-filter: blur(4px);
+    }
+
+    .panel-header {
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--sc-green);
+      text-transform: uppercase;
+      border-bottom: 1px solid rgba(56, 255, 106, 0.25);
+      padding-bottom: 5px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .trifocal-icon {
+      display: inline-flex;
+      gap: 3px;
+      align-items: center;
+    }
+
+    .trifocal-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--sc-green);
+      box-shadow: 0 0 6px var(--sc-green);
+    }
+
+    #objectives-panel {
+      min-width: 310px;
+      max-width: 360px;
+    }
+
+    .objective-item {
+      font-size: 12px;
+      line-height: 1.45;
+      margin: 4px 0;
+      color: #9ec5a8;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .objective-item.active {
+      color: #ffffff;
+      text-shadow: 0 0 6px rgba(56, 255, 106, 0.5);
+    }
+
+    .objective-item.done {
+      color: var(--sc-green);
+      text-decoration: line-through;
+      opacity: 0.75;
+    }
+
+    .obj-box {
+      width: 9px;
+      height: 9px;
+      border: 1px solid var(--sc-green);
+      display: inline-block;
+      flex-shrink: 0;
+    }
+
+    .objective-item.done .obj-box {
+      background: var(--sc-green);
+      box-shadow: 0 0 6px var(--sc-green);
+    }
+
+    /* Top Center Alert & Vision Status */
+    .hud-top-center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #alert-banner {
+      padding: 7px 18px;
+      font-size: 13px;
+      font-weight: bold;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      background: var(--hud-bg);
+      border: 1px solid var(--hud-border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #alert-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--sc-green);
+      box-shadow: 0 0 10px var(--sc-green);
+    }
+
+    .vision-bar {
+      display: flex;
+      gap: 6px;
+    }
+
+    .vision-pill {
+      font-size: 10px;
+      letter-spacing: 1.2px;
+      padding: 4px 9px;
+      border: 1px solid rgba(56, 255, 106, 0.3);
+      background: rgba(5, 14, 9, 0.75);
+      color: #7ea888;
+    }
+
+    .vision-pill.active {
+      color: #041208;
+      background: var(--sc-green);
+      border-color: var(--sc-green);
+      font-weight: bold;
+      box-shadow: 0 0 10px rgba(56, 255, 106, 0.65);
+    }
+
+    /* Top Right Tactical Minimap */
+    #minimap-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 10px;
+    }
+
+    #minimap-canvas {
+      width: 165px;
+      height: 165px;
+      border: 1px solid rgba(56, 255, 106, 0.45);
+      background: #030b06;
+      border-radius: 2px;
+    }
+
+    .minimap-caption {
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      color: var(--sc-green);
+      margin-top: 6px;
+    }
+
+    /* Center Aim Reticle & Context Prompt */
+    #reticle {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 28px;
+      height: 28px;
+      pointer-events: none;
+      transition: transform 0.12s ease, opacity 0.15s ease;
+      opacity: 0.45;
+    }
+
+    #reticle.aiming {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(0.82);
+    }
+
+    .ret-line {
+      position: absolute;
+      background: var(--sc-green);
+      box-shadow: 0 0 6px var(--sc-green);
+    }
+
+    .ret-top { top: 0; left: 13px; width: 2px; height: 8px; }
+    .ret-bottom { bottom: 0; left: 13px; width: 2px; height: 8px; }
+    .ret-left { left: 0; top: 13px; width: 8px; height: 2px; }
+    .ret-right { right: 0; top: 13px; width: 8px; height: 2px; }
+    .ret-dot {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--sc-green);
+    }
+
+    #interaction-prompt {
+      position: fixed;
+      top: 60%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(4, 16, 9, 0.92);
+      border: 1px solid var(--sc-green);
+      padding: 8px 18px;
+      font-size: 13px;
+      letter-spacing: 1.8px;
+      color: #ffffff;
+      box-shadow: 0 0 16px rgba(56, 255, 106, 0.45);
+      display: none;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #interaction-prompt.visible {
+      display: flex;
+    }
+
+    #hack-progress-container {
+      position: fixed;
+      top: 66%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 220px;
+      height: 8px;
+      background: rgba(5, 14, 9, 0.9);
+      border: 1px solid var(--sc-green);
+      display: none;
+    }
+
+    #hack-progress-container.visible {
+      display: block;
+    }
+
+    #hack-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--sc-green);
+      box-shadow: 0 0 10px var(--sc-green);
+    }
+
+    /* Bottom HUD: Light Gem, Stealth Telemetry, Gadgets */
+    .hud-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 16px;
+    }
+
+    #stealth-panel {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      min-width: 390px;
+    }
+
+    .light-gem-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+    }
+
+    #light-gem {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      border: 2px solid var(--sc-green);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle, #183622 0%, #050d08 75%);
+      box-shadow: 0 0 18px rgba(56, 255, 106, 0.35);
+      position: relative;
+    }
+
+    #light-gem-core {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--sc-green);
+      transition: background 0.12s ease, box-shadow 0.12s ease;
+    }
+
+    .gem-label {
+      font-size: 9px;
+      letter-spacing: 1.5px;
+      color: var(--sc-green);
+    }
+
+    .meters-column {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .meter-row {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .meter-label-line {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      letter-spacing: 1.2px;
+      color: #a9d8b4;
+    }
+
+    .meter-track {
+      width: 100%;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(56, 255, 106, 0.35);
+      overflow: hidden;
+    }
+
+    .meter-fill {
+      height: 100%;
+      width: 15%;
+      background: var(--sc-green);
+      transition: width 0.08s linear, background-color 0.15s ease;
+    }
+
+    /* Bottom Right Loadout & Controls Panel */
+    #weapon-panel {
+      min-width: 280px;
+    }
+
+    .weapon-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      font-size: 12px;
+    }
+
+    .emp-pips {
+      display: flex;
+      gap: 5px;
+    }
+
+    .emp-pip {
+      width: 16px;
+      height: 8px;
+      border: 1px solid var(--sc-cyan);
+      background: transparent;
+    }
+
+    .emp-pip.charged {
+      background: var(--sc-cyan);
+      box-shadow: 0 0 8px var(--sc-cyan);
+    }
+
+    .controls-compact {
+      font-size: 10px;
+      color: #8ab896;
+      line-height: 1.55;
+      border-top: 1px solid rgba(56, 255, 106, 0.2);
+      padding-top: 6px;
+      margin-top: 4px;
+    }
+
+    .key-badge {
+      color: var(--sc-green);
+      font-weight: bold;
+    }
+
+    /* Briefing & Mission Complete Modal */
+    #overlay-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      background: radial-gradient(circle at center, rgba(6, 22, 13, 0.88) 0%, rgba(2, 6, 4, 0.96) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-box {
+      max-width: 600px;
+      width: 100%;
+      background: rgba(5, 16, 10, 0.95);
+      border: 1px solid var(--sc-green);
+      box-shadow: 0 0 40px rgba(56, 255, 106, 0.25);
+      padding: 28px 32px;
+    }
+
+    .modal-title {
+      font-size: 26px;
+      letter-spacing: 4px;
+      color: var(--sc-green);
+      text-shadow: 0 0 14px rgba(56, 255, 106, 0.6);
+      margin-bottom: 4px;
+    }
+
+    .modal-subtitle {
+      font-size: 12px;
+      letter-spacing: 2.5px;
+      color: #82b38e;
+      margin-bottom: 18px;
+    }
+
+    .modal-body {
+      font-size: 13px;
+      line-height: 1.65;
+      color: #ccebd3;
+      margin-bottom: 20px;
+    }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 16px;
+      background: rgba(56, 255, 106, 0.06);
+      border: 1px solid rgba(56, 255, 106, 0.25);
+      padding: 12px 14px;
+      margin-bottom: 22px;
+      font-size: 12px;
+    }
+
+    .btn-deploy {
+      width: 100%;
+      padding: 12px 20px;
+      background: var(--sc-green);
+      color: #031207;
+      border: none;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: bold;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      cursor: pointer;
+      box-shadow: 0 0 18px rgba(56, 255, 106, 0.55);
+      transition: background 0.15s ease, transform 0.1s ease;
+    }
+
+    .btn-deploy:hover {
+      background: #6bff90;
+      transform: translateY(-1px);
+    }
+
+    /* ---------- Touch / mobile ---------- */
+    html.touch-ui, html.touch-ui body { touch-action: none; overscroll-behavior: none; -webkit-user-select: none; user-select: none; }
+    #touch-hud { display: none; position: fixed; inset: 0; z-index: 40; pointer-events: none; -webkit-tap-highlight-color: transparent; }
+    #touch-hud.active { display: block; }
+    #touch-hud.hidden-during-modal { display: none; }
+    .touch-zone { position: absolute; top: 0; bottom: 0; pointer-events: auto; touch-action: none; }
+    .touch-zone-move { left: 0; width: 45%; }
+    .touch-zone-look { right: 0; width: 55%; }
+    .touch-joystick { position: absolute; left: 0; top: 0; width: 120px; height: 120px; transform: translate(-50%, -50%); pointer-events: none; opacity: 0; transition: opacity 0.12s; }
+    .touch-joystick.engaged { opacity: 1; }
+    .touch-joystick-base { position: absolute; inset: 0; border-radius: 50%; border: 2px solid rgba(56,255,106,0.55); background: rgba(5,20,10,0.35); }
+    .touch-joystick-knob { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 50px; height: 50px; border-radius: 50%; background: rgba(56,255,106,0.45); border: 2px solid rgba(56,255,106,0.9); }
+    .touch-buttons { position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(3, 64px); gap: 8px; pointer-events: none; }
+    .touch-btn { pointer-events: auto; touch-action: none; width: 64px; height: 64px; border-radius: 50%; border: 2px solid rgba(56,255,106,0.6); background: rgba(5,20,10,0.55); color: #38ff6a; font: 700 11px 'Courier New', monospace; letter-spacing: 0.5px; padding: 0; }
+    .touch-btn.pressed, .touch-btn.latched { background: rgba(56,255,106,0.4); color: #031; }
+    .touch-btn-fire { border-color: rgba(255,80,80,0.8); color: #ff6b6b; }
+    .touch-btn-pause { position: absolute; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); width: 44px; height: 44px; font-size: 14px; }
+    #rotate-prompt { display: none; position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.92); color: #38ff6a; font: 700 16px 'Courier New', monospace; align-items: center; justify-content: center; text-align: center; padding: 24px; }
+    html[data-device="phone"][data-orientation="portrait"] #rotate-prompt { display: flex; }
+
+    /* Compact HUD on touch devices: hide keyboard hints, shrink panels. */
+    html.touch-ui .controls-compact, html.touch-ui .vision-bar { display: none; }
+    html.touch-ui #hud { padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 8px max(8px, env(safe-area-inset-left)); }
+    html.touch-ui .hud-bottom { display: none; }
+    html.touch-ui .hud-top { pointer-events: none; }
+    html[data-device="phone"] .hud-panel { padding: 6px 8px; font-size: 10px; }
+    html[data-device="phone"] #objectives-panel { max-width: 34vw; }
+    html[data-device="phone"] .objective-item { font-size: 9px; }
+    html[data-device="phone"] #minimap-canvas { width: 90px; height: 90px; }
+    html[data-device="phone"] .minimap-caption { display: none; }
+    html[data-device="phone"] #alert-banner { font-size: 10px; padding: 4px 8px; }
+    html.touch-ui #interaction-prompt { top: 42%; }
+    html.touch-ui .modal-box { max-height: 92vh; overflow-y: auto; width: min(92vw, 640px); }
+    html[data-device="phone"] .modal-title { font-size: 18px; }
+    html[data-device="phone"] .controls-grid { display: none; }
+    @media (max-width: 900px), (max-height: 500px) {
+      .modal-box { padding: 16px; }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three.module.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="game-container"></div>
+  <div id="rotate-prompt">ROTATE DEVICE TO LANDSCAPE<br>TO CONTINUE OPERATION</div>
+  <div id="vision-overlay"></div>
+
+  <!-- Tactical Crosshair & Interaction Prompts -->
+  <div id="reticle">
+    <div class="ret-line ret-top"></div>
+    <div class="ret-line ret-bottom"></div>
+    <div class="ret-line ret-left"></div>
+    <div class="ret-line ret-right"></div>
+    <div class="ret-dot"></div>
+  </div>
+  <div id="interaction-prompt">[E] SILENT TAKEDOWN</div>
+  <div id="hack-progress-container">
+    <div id="hack-progress-fill"></div>
+  </div>
+
+  <!-- Splinter Cell Tactical HUD -->
+  <div id="hud">
+    <div class="hud-top">
+      <!-- Mission Objectives -->
+      <div id="objectives-panel" class="hud-panel">
+        <div class="panel-header">
+          <span class="trifocal-icon">
+            <span class="trifocal-dot"></span>
+            <span class="trifocal-dot"></span>
+            <span class="trifocal-dot"></span>
+          </span>
+          THIRD ECHELON // OPERATION ARGON
+        </div>
+        <div id="obj-1" class="objective-item active">
+          <span class="obj-box"></span>
+          <span>1. Infiltrate Facility &amp; Hack Security Hub (Zone B)</span>
+        </div>
+        <div id="obj-2" class="objective-item">
+          <span class="obj-box"></span>
+          <span>2. Breach Server Vault &amp; Hack Argon Core Mainframe</span>
+        </div>
+        <div id="obj-3" class="objective-item">
+          <span class="obj-box"></span>
+          <span>3. Exfiltrate at North Helipad Extraction Zone</span>
+        </div>
+        <div id="obj-4" class="objective-item">
+          <span class="obj-box"></span>
+          <span>BONUS: Ghost Rating (Zero Guard Detections)</span>
+        </div>
+      </div>
+
+      <!-- Alert Status & Vision Mode Indicator -->
+      <div class="hud-top-center">
+        <div id="alert-banner">
+          <span id="alert-dot"></span>
+          <span id="alert-text">STATUS: STEALTH (UNDETECTED)</span>
+        </div>
+        <div class="vision-bar">
+          <div id="mode-norm" class="vision-pill active">[1] NORMAL</div>
+          <div id="mode-nvg" class="vision-pill">[2] NIGHT VISION</div>
+          <div id="mode-therm" class="vision-pill">[3] THERMAL IR</div>
+        </div>
+      </div>
+
+      <!-- Radar Minimap -->
+      <div id="minimap-panel" class="hud-panel">
+        <canvas id="minimap-canvas" width="165" height="165"></canvas>
+        <div class="minimap-caption">OPSAT RADAR // LOCAL</div>
+      </div>
+    </div>
+
+    <div class="hud-bottom">
+      <!-- Light Gem & Stealth Telemetry -->
+      <div id="stealth-panel" class="hud-panel">
+        <div class="light-gem-wrapper">
+          <div id="light-gem">
+            <div id="light-gem-core"></div>
+          </div>
+          <div class="gem-label" id="stance-text">CROUCH (STEALTH)</div>
+        </div>
+        <div class="meters-column">
+          <div class="meter-row">
+            <div class="meter-label-line">
+              <span>LIGHT VISIBILITY</span>
+              <span id="visibility-value">SHADOW</span>
+            </div>
+            <div class="meter-track">
+              <div id="visibility-bar" class="meter-fill"></div>
+            </div>
+          </div>
+          <div class="meter-row">
+            <div class="meter-label-line">
+              <span>ACOUSTIC NOISE</span>
+              <span id="noise-value">SILENT</span>
+            </div>
+            <div class="meter-track">
+              <div id="noise-bar" class="meter-fill"></div>
+            </div>
+          </div>
+          <div class="meter-row">
+            <div class="meter-label-line">
+              <span>AGENT INTEGRITY</span>
+              <span id="health-value">100%</span>
+            </div>
+            <div class="meter-track">
+              <div id="health-fill" class="meter-fill" style="width: 100%;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Silenced EMP Pistol & Controls -->
+      <div id="weapon-panel" class="hud-panel">
+        <div class="panel-header">SC-20K / SILENCED OCP-EMP PISTOL</div>
+        <div class="weapon-row">
+          <span>EMP CHARGES: <strong id="emp-count-text">3 / 3</strong></span>
+          <div id="emp-pips" class="emp-pips">
+            <div class="emp-pip charged"></div>
+            <div class="emp-pip charged"></div>
+            <div class="emp-pip charged"></div>
+          </div>
+        </div>
+        <div class="controls-compact">
+          <span class="key-badge">WASD</span> Move &bull;
+          <span class="key-badge">C</span> Crouch &bull;
+          <span class="key-badge">SHIFT</span> Sprint<br />
+          <span class="key-badge">RMB</span> Aim + <span class="key-badge">LMB</span> Shoot Light/Cam (EMP)<br />
+          <span class="key-badge">E</span> Silent Takedown / Hack &bull;
+          <span class="key-badge">Q</span> Whistle Lure<br />
+          <span class="key-badge">1/2/3</span> Vision Modes (Normal / NVG / Thermal)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mission Briefing / End Screen Modal -->
+  <div id="overlay-modal">
+    <div class="modal-box">
+      <div id="modal-title" class="modal-title">SHADOW CELL: OPERATION ARGON</div>
+      <div id="modal-subtitle" class="modal-subtitle">THIRD ECHELON // OPERATION ARGON // BLACK-SITE INFILTRATION</div>
+      <div id="modal-body" class="modal-body">
+        Welcome, Operative. You are infiltrating a fortified data facility under cover of darkness.
+        Stay in the shadows using your <strong>Light Gem</strong> indicator. Shoot overhead lights or CCTV cameras with your
+        <strong>Silenced OCP-EMP Pistol</strong> to create dark pathways, use your <strong>Trifocal Night &amp; Thermal Vision Goggles</strong>,
+        silently neutralize patrolling guards from behind, and hack both terminals to unlock the North Helipad extraction zone.
+      </div>
+      <div class="controls-grid">
+        <div><span class="key-badge">WASD + Mouse</span> : 3rd-Person Move &amp; Orbit</div>
+        <div><span class="key-badge">C</span> : Toggle Stealth Crouch</div>
+        <div><span class="key-badge">Right Click</span> : Over-Shoulder Aim</div>
+        <div><span class="key-badge">Left Click</span> : Fire Silenced EMP Shot</div>
+        <div><span class="key-badge">E</span> : Rear Takedown / Hold to Hack</div>
+        <div><span class="key-badge">Q</span> : Acoustic Whistle Distraction</div>
+        <div><span class="key-badge">2</span> : Toggle Night Vision (NVG)</div>
+        <div><span class="key-badge">3</span> : Toggle Thermal IR Vision</div>
+      </div>
+      <button id="start-mission-btn" class="btn-deploy">ENGAGE MISSION // LOCK CURSOR</button>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var startBtn = document.getElementById('start-mission-btn');
+      var modal = document.getElementById('overlay-modal');
+      if (startBtn && modal) {
+        startBtn.addEventListener('click', function () {
+          modal.classList.add('hidden');
+          modal.style.display = 'none';
+          if (window.shadowCellGame && typeof window.shadowCellGame.startMission === 'function') {
+            window.shadowCellGame.startMission();
+          }
+        });
+      }
+    })();
+  </script>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
