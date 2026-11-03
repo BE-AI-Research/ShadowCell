@@ -1,5 +1,7 @@
 # Shadow Cell: Operation Argon
 
+<img width="1024" height="498" alt="shadow-cell" src="https://github.com/user-attachments/assets/79cc089d-a642-4728-b0da-eb85858f387b" />
+
 A browser-based 3D third-person tactical stealth game inspired by *Splinter Cell*.
 Built with Three.js (vendored, r160) and the Web Audio API — plain ES modules, no build step.
 
