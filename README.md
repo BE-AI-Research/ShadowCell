@@ -12,8 +12,7 @@ North Helipad extraction zone.
 
 ## Play
 
-**Online:** `https://be-ai-research.github.io/ShadowCell/` (once GitHub Pages is enabled — see below)
-
+**Online:** https://be-ai-research.github.io/ShadowCell/
 **Locally:** ES modules cannot load from `file://`, so serve the folder over HTTP:
 
 ```sh
